@@ -1,3 +1,4 @@
+# Stage 1: Build the FastAPI application
 FROM python:3.9-slim as fastapi
 
 WORKDIR /app
@@ -9,13 +10,23 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+# Stage 2: Serve the application using Nginx
 FROM nginx:alpine
 
-COPY --from=fastapi /app /app
+# Install supervisord
+RUN apk add --no-cache supervisor
+
+# Copy Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Copy the FastAPI app from the previous stage
+COPY --from=fastapi /app /app
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose port 80 for Nginx
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+# Start supervisord
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
