@@ -1,52 +1,32 @@
-# Stage 1: Build the FastAPI application
-FROM python:3.9-slim AS builder
+FROM alpine:3.18
 
+# Install required packages
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    nginx
+
+# Set the working directory
 WORKDIR /app
 
-# Install required system packages
-RUN apt-get update && \
-    apt-get install -y python3-venv && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create and activate virtual environment
-RUN python -m venv /app/venv
-ENV PATH="/app/venv/bin:$PATH"
-
-# Install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir uvicorn
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY ./main.py /app/main.py
-COPY ./api /app/api
-COPY ./core /app/core
+# Copy the application code
+COPY . .
 
-# Stage 2: Final image
-FROM python:3.9-slim
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/http.d/default.conf
 
-# Install Nginx and Supervisor
-RUN apt-get update && \
-    apt-get install -y nginx supervisor && \
-    rm -rf /var/lib/apt/lists/*
+# Create start script
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'nginx' >> /start.sh && \
+    echo 'python3 -m uvicorn main:app --host 0.0.0.0 --port 8000' >> /start.sh && \
+    chmod +x /start.sh
 
-# Copy the entire app directory including venv from builder
-COPY --from=builder /app /app
-
-# Copy configurations
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /var/log/supervisor /var/run/supervisor /var/log/fastapi \
-    && touch /var/log/fastapi.err.log /var/log/fastapi.out.log \
-    && chmod -R 777 /var/log/supervisor /var/run/supervisor /var/log/fastapi
-
-# Add virtual environment to PATH
-ENV PATH="/app/venv/bin:$PATH"
-
-# Expose port
+# Expose port 80
 EXPOSE 80
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Start both services
+CMD ["/start.sh"]
