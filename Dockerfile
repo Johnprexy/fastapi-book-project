@@ -21,7 +21,7 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 
 # Create start script
 RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'nginx' >> /start.sh && \
+    echo 'nginx &' >> /start.sh && \
     echo 'python3 -m uvicorn main:app --host 0.0.0.0 --port 8000' >> /start.sh && \
     chmod +x /start.sh
 
