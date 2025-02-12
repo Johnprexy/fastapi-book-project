@@ -1,0 +1,12 @@
+{
+    "name": "fastapi-book-api",
+    "description": "A FastAPI Book API with Nginx",
+    "buildpacks": [
+      {
+        "url": "https://github.com/heroku/heroku-buildpack-nginx"
+      },
+      {
+        "url": "heroku/python"
+      }
+    ]
+  }
