@@ -27,8 +27,8 @@ jobs:
 
       - name: Save Docker image as tar
         run: |
-          docker save fastapi-app > fastapi-app.tar
-          ls -l fastapi-app.tar
+          docker save -o fastapi-app.tar fastapi-app  # Corrected syntax
+          ls -lh fastapi-app.tar  # Show file size for debugging
 
       - name: Ensure target directory exists and is writable
         uses: appleboy/ssh-action@master
@@ -38,8 +38,8 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             mkdir -p ~/deployments
-            cd ~/deployments
-            rm -f fastapi-app.tar
+            chmod 777 ~/deployments  # Ensure it's writable
+            rm -f ~/deployments/fastapi-app.tar
 
       - name: Copy Docker image to DigitalOcean VM
         uses: appleboy/scp-action@master
@@ -58,21 +58,34 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             cd ~/deployments
+
             if [ ! -f fastapi-app.tar ]; then
-              echo "Error: fastapi-app.tar not found"
+              echo "❌ Error: fastapi-app.tar not found"
               exit 1
             fi
+
+            # Stop existing container if running
             docker stop fastapi-app || true
             docker rm fastapi-app || true
             docker rmi fastapi-app || true
-            docker load < fastapi-app.tar
+
+            # Check if something is using port 80 and kill it
+            sudo lsof -i :80 | awk 'NR>1 {print $2}' | xargs sudo kill -9 || true
+
+            # Load new image
+            docker load -i fastapi-app.tar
             if [ $? -ne 0 ]; then
-              echo "Error: Failed to load Docker image"
+              echo "❌ Error: Failed to load Docker image"
               exit 1
             fi
+
+            # Run the new container
             docker run -d --name fastapi-app -p 80:80 --restart always fastapi-app
             if [ $? -ne 0 ]; then
-              echo "Error: Failed to start container"
+              echo "❌ Error: Failed to start container"
               exit 1
             fi
-            rm fastapi-app.tar
+
+            # Cleanup
+            rm -f fastapi-app.tar
+            echo "✅ Deployment successful!"
