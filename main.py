@@ -11,10 +11,11 @@ class Book(BaseModel):
     title: str
     author: str
 
-# Sample books data
+# Sample books data 
 books = [
     {"id": 1, "title": "Book 1", "author": "Author 1"},
     {"id": 2, "title": "Book 2", "author": "Author 2"},
+    {"id": 3, "title": "Book 3", "author": "Author 3"}, 
 ]
 
 # CORS middleware configuration
@@ -46,26 +47,24 @@ async def get_book(book_id: int):
 async def list_books():
     return books
 
-# ✅ **Fix: Implement `POST` route**
+
 @app.post("/api/v1/books", status_code=201)
 async def create_book(book: Book):
     existing_book = next((b for b in books if b["id"] == book.id), None)
     if existing_book:
         raise HTTPException(status_code=400, detail="Book with this ID already exists")
     
-    books.append(book.dict())
+    books.append(book.model_dump()) 
     return book
 
-# ✅ **Fix: Implement `PUT` route**
 @app.put("/api/v1/books/{book_id}")
 async def update_book(book_id: int, updated_book: Book):
     for i, book in enumerate(books):
         if book["id"] == book_id:
-            books[i] = updated_book.dict()
+            books[i] = updated_book.model_dump() 
             return updated_book
     raise HTTPException(status_code=404, detail="Book not found")
 
-# ✅ **Fix: Implement `DELETE` route**
 @app.delete("/api/v1/books/{book_id}", status_code=204)
 async def delete_book(book_id: int):
     global books
