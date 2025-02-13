@@ -26,10 +26,15 @@ jobs:
         run: docker build -t fastapi-app .
 
       - name: Fix permissions before creating tar
-        run: chmod -R 755 .
+        run: |
+          chmod -R 755 .
+          sudo chown -R $USER:$USER .
 
       - name: Save Docker image as tar
-        run: docker save fastapi-app -o fastapi-app.tar
+        run: |
+          docker save fastapi-app -o fastapi-app.tar
+          chmod 644 fastapi-app.tar
+          sudo chown $USER:$USER fastapi-app.tar
 
       - name: Ensure target directory exists and is writable
         uses: appleboy/ssh-action@master
@@ -49,6 +54,7 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           source: "fastapi-app.tar"
           target: "~/deployments/"
+          strip_components: 1
 
       - name: Deploy on DigitalOcean VM
         uses: appleboy/ssh-action@master
@@ -58,8 +64,10 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             cd ~/deployments
+            chmod 644 fastapi-app.tar
             docker stop fastapi-app || true
             docker rm fastapi-app || true
             docker rmi fastapi-app || true
             docker load -i fastapi-app.tar
             docker run -d --name fastapi-app -p 8000:8000 --restart always fastapi-app
+            rm fastapi-app.tar
