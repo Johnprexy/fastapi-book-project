@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from api.db.schemas import Book, Genre, InMemoryDB
 from fastapi import HTTPException
-from models import Book, db
+
 
 router = APIRouter()
 

@@ -27,8 +27,9 @@ jobs:
 
       - name: Save Docker image as tar
         run: |
-          docker save -o fastapi-app.tar fastapi-app  # Corrected syntax
-          ls -lh fastapi-app.tar  # Show file size for debugging
+          docker save -o fastapi-app.tar fastapi-app
+          chmod 644 fastapi-app.tar  # Ensure read access
+          ls -lh fastapi-app.tar  # Debugging output
 
       - name: Ensure target directory exists and is writable
         uses: appleboy/ssh-action@master
@@ -38,7 +39,7 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             mkdir -p ~/deployments
-            chmod 777 ~/deployments  # Ensure it's writable
+            chmod 777 ~/deployments  # Ensure directory is writable
             rm -f ~/deployments/fastapi-app.tar
 
       - name: Copy Docker image to DigitalOcean VM
@@ -64,12 +65,12 @@ jobs:
               exit 1
             fi
 
-            # Stop existing container if running
+            # Stop and remove old container
             docker stop fastapi-app || true
             docker rm fastapi-app || true
             docker rmi fastapi-app || true
 
-            # Check if something is using port 80 and kill it
+            # Check if port 80 is in use, kill the process if needed
             sudo lsof -i :80 | awk 'NR>1 {print $2}' | xargs sudo kill -9 || true
 
             # Load new image
