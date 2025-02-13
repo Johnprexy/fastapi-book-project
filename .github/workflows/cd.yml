@@ -25,16 +25,10 @@ jobs:
       - name: Build Docker image
         run: docker build -t fastapi-app .
 
-      - name: Fix permissions before creating tar
-        run: |
-          chmod -R 755 .
-          sudo chown -R $USER:$USER .
-
       - name: Save Docker image as tar
         run: |
-          docker save fastapi-app -o fastapi-app.tar
-          chmod 644 fastapi-app.tar
-          sudo chown $USER:$USER fastapi-app.tar
+          docker save fastapi-app > fastapi-app.tar
+          ls -l fastapi-app.tar
 
       - name: Ensure target directory exists and is writable
         uses: appleboy/ssh-action@master
@@ -44,7 +38,8 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             mkdir -p ~/deployments
-            chmod 777 ~/deployments
+            cd ~/deployments
+            rm -f fastapi-app.tar
 
       - name: Copy Docker image to DigitalOcean VM
         uses: appleboy/scp-action@master
@@ -53,8 +48,7 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           source: "fastapi-app.tar"
-          target: "~/deployments/"
-          strip_components: 1
+          target: "~/deployments"
 
       - name: Deploy on DigitalOcean VM
         uses: appleboy/ssh-action@master
@@ -64,10 +58,21 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             cd ~/deployments
-            chmod 644 fastapi-app.tar
+            if [ ! -f fastapi-app.tar ]; then
+              echo "Error: fastapi-app.tar not found"
+              exit 1
+            fi
             docker stop fastapi-app || true
             docker rm fastapi-app || true
             docker rmi fastapi-app || true
-            docker load -i fastapi-app.tar
-            docker run -d --name fastapi-app -p 8000:8000 --restart always fastapi-app
+            docker load < fastapi-app.tar
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to load Docker image"
+              exit 1
+            fi
+            docker run -d --name fastapi-app -p 80:80 --restart always fastapi-app
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to start container"
+              exit 1
+            fi
             rm fastapi-app.tar
