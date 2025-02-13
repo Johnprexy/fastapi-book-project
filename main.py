@@ -70,3 +70,8 @@ async def delete_book(book_id: int):
     global books
     books = [book for book in books if book["id"] != book_id]
     return
+def test_get_single_book():
+    response = client.get("/api/v1/books/1")  
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Book 1"  
